@@ -1,21 +1,8 @@
-#include <string.h>
-
 #include "bme_user.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "spi.h"
-
-#if defined(BME280)
-
-#include "bme280.h"
-static struct bme280_dev dev;
-
-#elif defined(BME680)
-
-#include "bme680.h"
-static struct bme680_dev dev;
-
-#endif
+#include <string.h>
 
 void user_delay_ms(uint32_t ms)
 {
@@ -102,23 +89,78 @@ int8_t user_spi_write(uint8_t dev_id, uint8_t reg_addr, uint8_t* reg_data, uint1
     return ret;
 }
 
-int8_t init_bme()
+int8_t init_bme280(struct bme280_dev* dev)
 {
-    int8_t rslt = 0;
+    int8_t  rslt = 0;
+    uint8_t settings_sel;
 
     /* Sensor_0 interface over SPI with native chip select line */
-    dev.dev_id   = 0;
-    dev.intf     = 0; // BME2(6)80_SPI_INTF;
-    dev.read     = user_spi_read;
-    dev.write    = user_spi_write;
-    dev.delay_ms = user_delay_ms;
+    dev->dev_id   = 0;
+    dev->intf     = BME280_SPI_INTF;
+    dev->read     = user_spi_read;
+    dev->write    = user_spi_write;
+    dev->delay_ms = user_delay_ms;
 
-#if defined(BME280)
-    rslt = bme280_init(&dev);
-#elif defined(BME680)
-    dev.amb_temp = 25;
-    rslt         = bme680_init(&dev);
-#endif
+    rslt = bme280_init(dev);
+
+    /* Recommended mode of operation: Indoor navigation */
+    dev->settings.osr_h        = BME280_OVERSAMPLING_1X;
+    dev->settings.osr_p        = BME280_OVERSAMPLING_16X;
+    dev->settings.osr_t        = BME280_OVERSAMPLING_2X;
+    dev->settings.filter       = BME280_FILTER_COEFF_2;
+    dev->settings.standby_time = BME280_STANDBY_TIME_62_5_MS;
+
+    settings_sel = BME280_OSR_PRESS_SEL;
+    settings_sel |= BME280_OSR_TEMP_SEL;
+    settings_sel |= BME280_OSR_HUM_SEL;
+    settings_sel |= BME280_STANDBY_SEL;
+    settings_sel |= BME280_FILTER_SEL;
+    rslt = bme280_set_sensor_settings(settings_sel, dev);
+    rslt = bme280_set_sensor_mode(BME280_NORMAL_MODE, dev);
+
+    return rslt;
+}
+
+int8_t init_bme680(struct bme680_dev* dev)
+{
+    int8_t  rslt = 0;
+    uint8_t set_required_settings;
+
+    // Sensor_0 interface over SPI with native chip select line */
+    dev->dev_id = 0;
+    dev->intf   = BME680_SPI_INTF;
+    ;
+    dev->read     = user_spi_read;
+    dev->write    = user_spi_write;
+    dev->delay_ms = user_delay_ms;
+    dev->amb_temp = 25;
+
+    rslt = bme680_init(dev);
+
+    // Set the temperature, pressure and humidity settings
+    dev->tph_sett.os_hum  = BME680_OS_2X;
+    dev->tph_sett.os_pres = BME680_OS_4X;
+    dev->tph_sett.os_temp = BME680_OS_8X;
+    dev->tph_sett.filter  = BME680_FILTER_SIZE_3;
+
+    // Set the remaining gas sensor settings and link the heating profile
+    dev->gas_sett.run_gas = BME680_ENABLE_GAS_MEAS;
+    // Create a ramp heat waveform in 3 steps
+    dev->gas_sett.heatr_temp = 320; // degree Celsius
+    dev->gas_sett.heatr_dur  = 150; // milliseconds
+
+    // Select the power mode
+    // Must be set before writing the sensor configuration
+    dev->power_mode = BME680_FORCED_MODE;
+
+    // Set the required sensor settings needed */
+    set_required_settings = BME680_OST_SEL | BME680_OSP_SEL | BME680_OSH_SEL | BME680_FILTER_SEL | BME680_GAS_SENSOR_SEL;
+
+    // Set the desired sensor configuration */
+    rslt = bme680_set_sensor_settings(set_required_settings, dev);
+
+    // Set the power mode */
+    rslt = bme680_set_sensor_mode(dev);
 
     return rslt;
 }

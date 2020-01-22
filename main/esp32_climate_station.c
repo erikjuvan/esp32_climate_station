@@ -4,7 +4,6 @@
 #include "esp_event.h"
 #include "esp_log.h"
 #include "esp_netif.h"
-#include "esp_now.h"
 #include "esp_system.h"
 #include "esp_wifi.h"
 #include "freertos/FreeRTOS.h"
@@ -17,6 +16,19 @@
 #include <string.h>
 #include <time.h>
 
+#if defined(BME280)
+typedef struct bme280_data bme_data_t;
+typedef struct bme280_dev  bme_dev_t;
+#elif defined(BME680)
+typedef struct bme680_field_data bme_data_t;
+typedef struct bme680_dev        bme_dev_t;
+#endif
+
+static const int sizeof_bme = sizeof(bme_data_t);
+static bme_dev_t bme_dev;
+
+static const int ESPNOW_SEND_LEN = sizeof(example_espnow_data_t) + sizeof_bme;
+
 static const char* TAG = "esp32_climate_station";
 
 static xQueueHandle s_example_espnow_queue;
@@ -25,6 +37,17 @@ static uint8_t  s_example_broadcast_mac[ESP_NOW_ETH_ALEN]     = {0xFF, 0xFF, 0xF
 static uint16_t s_example_espnow_seq[EXAMPLE_ESPNOW_DATA_MAX] = {0, 0};
 
 static void example_espnow_deinit(example_espnow_send_param_t* send_param);
+
+static bme_data_t get_bme_data()
+{
+    bme_data_t data;
+#if defined(BME280)
+    bme280_get_sensor_data(BME280_ALL, &data, &bme_dev);
+#elif defined(BME680)
+    bme680_get_sensor_data(&data, &bme_dev);
+#endif
+    return data;
+}
 
 /* WiFi should start before using ESPNOW */
 static void example_wifi_init(void)
@@ -89,7 +112,7 @@ static void example_espnow_recv_cb(const uint8_t* mac_addr, const uint8_t* data,
 }
 
 /* Parse received ESPNOW data. */
-int example_espnow_data_parse(uint8_t* data, uint16_t data_len, uint8_t* state, uint16_t* seq, int* magic)
+int example_espnow_data_parse(uint8_t* data, uint16_t data_len, void* bme_data, uint8_t* state, uint16_t* seq, int* magic)
 {
     example_espnow_data_t* buf = (example_espnow_data_t*)data;
     uint16_t               crc, crc_cal = 0;
@@ -107,6 +130,7 @@ int example_espnow_data_parse(uint8_t* data, uint16_t data_len, uint8_t* state, 
     crc_cal  = esp_crc16_le(UINT16_MAX, (uint8_t const*)buf, data_len);
 
     if (crc_cal == crc) {
+        memcpy(bme_data, buf->payload, sizeof_bme);
         return buf->type;
     }
 
@@ -116,7 +140,8 @@ int example_espnow_data_parse(uint8_t* data, uint16_t data_len, uint8_t* state, 
 /* Prepare ESPNOW data to be sent. */
 void example_espnow_data_prepare(example_espnow_send_param_t* send_param)
 {
-    example_espnow_data_t* buf = (example_espnow_data_t*)send_param->buffer;
+    bme_data_t             bme_data = get_bme_data();
+    example_espnow_data_t* buf      = (example_espnow_data_t*)send_param->buffer;
 
     assert(send_param->len >= sizeof(example_espnow_data_t));
 
@@ -126,7 +151,7 @@ void example_espnow_data_prepare(example_espnow_send_param_t* send_param)
     buf->crc     = 0;
     buf->magic   = send_param->magic;
     /* Fill all remaining bytes after the data with random values */
-    esp_fill_random(buf->payload, send_param->len - sizeof(example_espnow_data_t));
+    memcpy(buf->payload, &bme_data, sizeof_bme);
     buf->crc = esp_crc16_le(UINT16_MAX, (uint8_t const*)buf, send_param->len);
 }
 
@@ -140,7 +165,6 @@ static void example_espnow_task(void* pvParameter)
     int                    ret;
 
     vTaskDelay(5000 / portTICK_RATE_MS);
-    ESP_LOGI(TAG, "Start sending broadcast data");
 
     /* Start sending broadcast ESPNOW data. */
     example_espnow_send_param_t* send_param = (example_espnow_send_param_t*)pvParameter;
@@ -160,15 +184,6 @@ static void example_espnow_task(void* pvParameter)
 
             if (is_broadcast && (send_param->broadcast == false)) {
                 break;
-            }
-
-            if (!is_broadcast) {
-                send_param->count--;
-                if (send_param->count == 0) {
-                    ESP_LOGI(TAG, "Send done");
-                    example_espnow_deinit(send_param);
-                    vTaskDelete(NULL);
-                }
             }
 
             /* Delay a while before sending the next data. */
@@ -191,12 +206,12 @@ static void example_espnow_task(void* pvParameter)
         }
         case EXAMPLE_ESPNOW_RECV_CB: {
             example_espnow_event_recv_cb_t* recv_cb = &evt.info.recv_cb;
+            bme_data_t                      bme_data;
 
-            ret = example_espnow_data_parse(recv_cb->data, recv_cb->data_len, &recv_state, &recv_seq, &recv_magic);
+            ret = example_espnow_data_parse(recv_cb->data, recv_cb->data_len, &bme_data, &recv_state, &recv_seq, &recv_magic);
             free(recv_cb->data);
             if (ret == EXAMPLE_ESPNOW_DATA_BROADCAST) {
                 ESP_LOGI(TAG, "Receive %dth broadcast data from: " MACSTR ", len: %d", recv_seq, MAC2STR(recv_cb->mac_addr), recv_cb->data_len);
-
                 /* If MAC address does not exist in peer list, add it to peer list. */
                 if (esp_now_is_peer_exist(recv_cb->mac_addr) == false) {
                     esp_now_peer_info_t* peer = malloc(sizeof(esp_now_peer_info_t));
@@ -248,7 +263,11 @@ static void example_espnow_task(void* pvParameter)
                 }
             } else if (ret == EXAMPLE_ESPNOW_DATA_UNICAST) {
                 ESP_LOGI(TAG, "Receive %dth unicast data from: " MACSTR ", len: %d", recv_seq, MAC2STR(recv_cb->mac_addr), recv_cb->data_len);
-
+#if defined(BME280)
+                printf("%.2f *C, %.1f %%rH, %d mBar", bme_data.temperature / 100.0, bme_data.humidity / 1024.f, bme_data.pressure / 10000);
+#elif defined(BME680)
+                printf("%.2f *C, %.1f %%rH, %d mBar, %d Ohm", bme_data.temperature / 100.0, bme_data.humidity / 1000.f, bme_data.pressure / 100, bme_data.gas_resistance);
+#endif
                 /* If receive unicast ESPNOW data, also stop sending broadcast ESPNOW data. */
                 send_param->broadcast = false;
             } else {
@@ -310,10 +329,9 @@ static esp_err_t example_espnow_init(void)
     send_param->broadcast = true;
     send_param->state     = 0;
     send_param->magic     = esp_random();
-    send_param->count     = CONFIG_ESPNOW_SEND_COUNT;
-    send_param->delay     = CONFIG_ESPNOW_SEND_DELAY;
-    send_param->len       = CONFIG_ESPNOW_SEND_LEN;
-    send_param->buffer    = malloc(CONFIG_ESPNOW_SEND_LEN);
+    send_param->delay     = 10 * 1000; // 10 ms
+    send_param->len       = ESPNOW_SEND_LEN;
+    send_param->buffer    = malloc(ESPNOW_SEND_LEN);
     if (send_param->buffer == NULL) {
         ESP_LOGE(TAG, "Malloc send buffer fail");
         free(send_param);
@@ -348,7 +366,11 @@ void app_main(void)
     ESP_ERROR_CHECK(ret);
 
     init_spi();
-    init_bme();
+#if defined(BME280)
+    init_bme280(&bme_dev);
+#elif defined(BME680)
+    init_bme680(&bme_dev);
+#endif
     example_wifi_init();
     example_espnow_init();
 }

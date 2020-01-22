@@ -10,3 +10,4 @@ ColumnLimit: 0
 AlignConsecutiveAssignments: true
 AlignConsecutiveDeclarations: true
 BreakConstructorInitializers: AfterColon
+IncludeBlocks: Merge
