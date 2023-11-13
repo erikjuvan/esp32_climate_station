@@ -16,7 +16,7 @@ int uart_transmit(const char* data, int len)
 
 int uart_receive(uint8_t* dest, int len)
 {
-    return uart_read_bytes(UART_NUM, dest, len, 1000 / portTICK_RATE_MS);
+    return uart_read_bytes(UART_NUM, dest, len, 1000 / portTICK_PERIOD_MS);
 }
 
 esp_err_t init_uart()
@@ -38,3 +38,4 @@ esp_err_t init_uart()
 
     return ret;
 }
+

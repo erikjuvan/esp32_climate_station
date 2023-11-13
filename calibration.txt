@@ -1,0 +1,4 @@
+1. temp dvignit za 0.2, rh spustit za 2
+2. temp spustit za 0.2, rh dvignit za 2
+3. temp spustit za 0.2, rh ok
+4. temp spustit za 0.8, rh dvignit za 1

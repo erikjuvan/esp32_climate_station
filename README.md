@@ -1,3 +1,3 @@
 # ESP32 Climate Station
 
-Using ESPNOW for wifi communication. Two modes of operation: SERVER / CLIENT, and support for 2 sensors: BME280 and BME680.
+Using wifi communication, send BME280 or BME680 to PC server.

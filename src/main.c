@@ -1,4 +1,4 @@
-#include "esp32_climate_station.h"
+#include "main.h"
 #include "bme_user.h"
 #include "esp_crc.h"
 #include "esp_event.h"
@@ -371,6 +371,20 @@ void app_main(void)
 #elif defined(BME680)
     init_bme680(&bme_dev);
 #endif
-    example_wifi_init();
-    example_espnow_init();
+
+    //example_wifi_init();
+
+	while (1)
+	{
+        bme_data_t bme_data = get_bme_data();
+
+#if defined(BME280)
+        printf("%.2f *C, %.1f %%rH, %d mBar\n", bme_data.temperature / 100.0, bme_data.humidity / 1024.f, bme_data.pressure / 10000);
+#elif defined(BME680)
+        printf("%.2f *C, %.1f %%rH, %d mBar, %d Ohm\n", bme_data.temperature / 100.0, bme_data.humidity / 1000.f, bme_data.pressure / 100, bme_data.gas_resistance);
+#endif
+
+        vTaskDelay(1000 / portTICK_PERIOD_MS);
+	
+	}
 }
