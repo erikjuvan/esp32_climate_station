@@ -1,13 +1,27 @@
-# The following lines of boilerplate have to be in your project's CMakeLists
-# in this exact order for cmake to work correctly
+# Minimum required version of CMake
 cmake_minimum_required(VERSION 3.20)
 
-set(SUPPORTED_TARGETS esp32)
-include($ENV{IDF_PATH}/tools/cmake/project.cmake)
+# Project name
 project(esp32_climate_station)
 
-idf_component_register(SRCS main.c bme_user.c bme280.c bme68x.c spi.c
-                    INCLUDE_DIRS "." "../submodules/BME280_driver" "../submodules/BME68x-Sensor-API")
+# Include the ESP-IDF CMake build system
+set(SUPPORTED_TARGETS esp32)
+include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 
-# Must define BME280/BME68x
+# Register the components of your project
+idf_component_register(
+    SRCS 
+    main.c
+    bme_user.c
+    bme280.c
+    bme68x.c
+    spi.c
+
+    INCLUDE_DIRS
+    "."
+    "../submodules/BME280_driver"
+    "../submodules/BME68x-Sensor-API"
+)
+
+# Define compilation flags or options if needed
 target_compile_definitions(${COMPONENT_TARGET} PRIVATE "-DBME280")
