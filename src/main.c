@@ -11,9 +11,9 @@
 #if defined(BME280)
 typedef struct bme280_data bme_data_t;
 typedef struct bme280_dev  bme_dev_t;
-#elif defined(BME680)
-typedef struct bme680_field_data bme_data_t;
-typedef struct bme680_dev        bme_dev_t;
+#elif defined(BME68x)
+typedef struct bme68x_data bme_data_t;
+typedef struct bme68x_dev  bme_dev_t;
 #endif
 
 static const int sizeof_bme = sizeof(bme_data_t);
@@ -26,8 +26,8 @@ static bme_data_t get_bme_data()
     bme_data_t data;
 #if defined(BME280)
     bme280_get_sensor_data(BME280_ALL, &data, &bme_dev);
-#elif defined(BME680)
-    bme680_get_sensor_data(&data, &bme_dev);
+#elif defined(BME68x)
+    bme68x_get_data(&data, &bme_dev);
 #endif
     return data;
 }
@@ -53,8 +53,8 @@ void app_main(void)
     init_spi();
 #if defined(BME280)
     init_bme280(&bme_dev);
-#elif defined(BME680)
-    init_bme680(&bme_dev);
+#elif defined(BME68x)
+    init_bme68x(&bme_dev);
 #endif
 
     //example_wifi_init();
@@ -65,7 +65,7 @@ void app_main(void)
 
 #if defined(BME280)
         printf("%.2f *C, %.1f %%rH, %d mBar\n", bme_data.temperature / 100.0, bme_data.humidity / 1024.f, bme_data.pressure / 10000);
-#elif defined(BME680)
+#elif defined(BME68x)
         printf("%.2f *C, %.1f %%rH, %d mBar, %d Ohm\n", bme_data.temperature / 100.0, bme_data.humidity / 1000.f, bme_data.pressure / 100, bme_data.gas_resistance);
 #endif
 

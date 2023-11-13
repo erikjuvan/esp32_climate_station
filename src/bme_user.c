@@ -121,46 +121,46 @@ int8_t init_bme280(struct bme280_dev* dev)
     return rslt;
 }
 
-int8_t init_bme680(struct bme680_dev* dev)
+int8_t init_bme68x(struct bme68x_dev* dev)
 {
     int8_t  rslt = 0;
     uint8_t set_required_settings;
 
     // Sensor_0 interface over SPI with native chip select line */
     dev->dev_id = 0;
-    dev->intf   = BME680_SPI_INTF;
+    dev->intf   = BME68x_SPI_INTF;
     ;
     dev->read     = user_spi_read;
     dev->write    = user_spi_write;
     dev->delay_ms = user_delay_ms;
     dev->amb_temp = 25;
 
-    rslt = bme680_init(dev);
+    rslt = bme68x_init(dev);
 
     // Set the temperature, pressure and humidity settings
-    dev->tph_sett.os_hum  = BME680_OS_2X;
-    dev->tph_sett.os_pres = BME680_OS_4X;
-    dev->tph_sett.os_temp = BME680_OS_8X;
-    dev->tph_sett.filter  = BME680_FILTER_SIZE_3;
+    dev->tph_sett.os_hum  = BME68x_OS_2X;
+    dev->tph_sett.os_pres = BME68x_OS_4X;
+    dev->tph_sett.os_temp = BME68x_OS_8X;
+    dev->tph_sett.filter  = BME68x_FILTER_SIZE_3;
 
     // Set the remaining gas sensor settings and link the heating profile
-    dev->gas_sett.run_gas = BME680_ENABLE_GAS_MEAS;
+    dev->gas_sett.run_gas = BME68x_ENABLE_GAS_MEAS;
     // Create a ramp heat waveform in 3 steps
     dev->gas_sett.heatr_temp = 320; // degree Celsius
     dev->gas_sett.heatr_dur  = 150; // milliseconds
 
     // Select the power mode
     // Must be set before writing the sensor configuration
-    dev->power_mode = BME680_FORCED_MODE;
+    dev->power_mode = BME68x_FORCED_MODE;
 
     // Set the required sensor settings needed */
-    set_required_settings = BME680_OST_SEL | BME680_OSP_SEL | BME680_OSH_SEL | BME680_FILTER_SEL | BME680_GAS_SENSOR_SEL;
+    set_required_settings = BME68x_OST_SEL | BME68x_OSP_SEL | BME68x_OSH_SEL | BME68x_FILTER_SEL | BME68x_GAS_SENSOR_SEL;
 
     // Set the desired sensor configuration */
-    rslt = bme680_set_sensor_settings(set_required_settings, dev);
+    rslt = bme68x_set_sensor_settings(set_required_settings, dev);
 
     // Set the power mode */
-    rslt = bme680_set_sensor_mode(dev);
+    rslt = bme68x_set_sensor_mode(dev);
 
     return rslt;
 }
