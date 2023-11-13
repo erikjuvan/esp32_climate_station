@@ -41,6 +41,8 @@ int8_t user_spi_read(uint8_t dev_id, uint8_t reg_addr, uint8_t* reg_data, uint16
     t.rx_buffer = reg_data; // Data
     t.user      = NULL;     // D/C needs to be set to 1
 
+    spi_device_handle_t spi = *get_spi_handle();
+
     ret = spi_device_polling_transmit(spi, &t); //Transmit!
 
     assert(ret == ESP_OK); //Should have had no issues.
@@ -81,6 +83,8 @@ int8_t user_spi_write(uint8_t dev_id, uint8_t reg_addr, uint8_t* reg_data, uint1
     t.addr      = reg_addr;
     t.tx_buffer = reg_data; // Data
     t.user      = (void*)1; // D/C needs to be set to 1
+
+    spi_device_handle_t spi = *get_spi_handle();
 
     ret = spi_device_polling_transmit(spi, &t); //Transmit!
 

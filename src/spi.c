@@ -5,11 +5,13 @@
 #define PIN_NUM_CLK 18
 #define PIN_NUM_CS 5
 
-spi_device_handle_t spi;
+static spi_device_handle_t spi_handle;
 
 esp_err_t init_spi()
 {
     esp_err_t        ret;
+
+    //Initialize the SPI bus
     spi_bus_config_t buscfg = {
         .miso_io_num     = PIN_NUM_MISO,
         .mosi_io_num     = PIN_NUM_MOSI,
@@ -17,6 +19,11 @@ esp_err_t init_spi()
         .quadwp_io_num   = -1,
         .quadhd_io_num   = -1,
         .max_transfer_sz = 100};
+        
+    ret = spi_bus_initialize(VSPI_HOST, &buscfg, 1);
+    ESP_ERROR_CHECK(ret);
+
+    //Attach the sensor to the SPI bus
     spi_device_interface_config_t devcfg = {
         .address_bits   = 8,
         .clock_speed_hz = 1 * 1000 * 1000, // Clock out at 1 MHz
@@ -26,13 +33,13 @@ esp_err_t init_spi()
                                            //.flags = SPI_TRANS_USE_RXDATA | SPI_TRANS_USE_TXDATA
     };
 
-    //Initialize the SPI bus
-    ret = spi_bus_initialize(VSPI_HOST, &buscfg, 1);
-    ESP_ERROR_CHECK(ret);
-    //Attach the LCD to the SPI bus
-    ret = spi_bus_add_device(VSPI_HOST, &devcfg, &spi);
-    ESP_ERROR_CHECK(ret);
+    ret = spi_bus_add_device(VSPI_HOST, &devcfg, &spi_handle);
     ESP_ERROR_CHECK(ret);
 
     return ret;
+}
+
+const spi_device_handle_t* get_spi_handle(void)
+{
+    return &spi_handle;
 }
