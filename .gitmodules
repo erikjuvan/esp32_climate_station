@@ -1,0 +1,8 @@
+[submodule "submodules/BME280_driver"]
+	path = submodules/BME280_driver
+	url = https://github.com/boschsensortec/BME280_driver
+	branch = master
+[submodule "submodules/BME68x-Sensor-API"]
+	path = submodules/BME68x-Sensor-API
+	url = https://github.com/BoschSensortec/BME68x-Sensor-API
+	branch = master
